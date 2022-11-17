@@ -26,14 +26,15 @@ with g-code targeting Marlin printers. However, there are also some nice extras:
   provided a much easier way to customize materials in the LCD menu (or at least
   I think so). I've also added confirmation dialogs for commands that would
   abort an active print.
-* **[Optimized mesh bed leveling](#bed-mesh-fast)** - Probes only within the
-  printed area, which can save a lot of time on smaller prints.
+* **[Optimized mesh bed leveling](#bed-mesh-improvements)** - Probes only within
+  the printed area, which can save a lot of time on smaller prints.
 
 ## A few warnings...
 
-* You must have `heater_bed` and `extruder` sections configured, otherwise the
-  macros won't even load. The Klipper macro system makes it impossible to handle
-  this without adding more end-user configuration, so I decided not to bother.
+* You must have a `heater_bed`, `extruder`, and other [sections listed
+  below](#klipper-setup) configured, otherwise the macros will ***force a
+  printer shutdown at startup***. Unfortunately, the Klipper macro
+  doesn't have a more graceful way of handling this sort of thing.
 * The multi-extruder and chamber heater functionality is very under-tested and
   may have bugs, since I haven't used it much at all. Patches welcome.
 * There's probably other stuff I haven't used enough to thoroughly, so use
@@ -77,7 +78,12 @@ overridden by creating a corresponding variable with a new value in your
 #  {'name' : 'PLA',  'extruder' : 200.0, 'bed' : 60.0},
 #  {'name' : 'PETG', 'extruder' : 230.0, 'bed' : 85.0},
 #  {'name' : 'ABS',  'extruder' : 245.0, 'bed' : 110.0, 'chamber' : 60}]
-gcode: # This line required by Klipper.
+gcode: # This line is required by Klipper.
+# Any code you put here will run at klipper startup, after the initialization
+# for these macros. For example, you could uncomment the following line to
+# automatically adjust your bed surface offsets to account for any changes made
+# to your Z endstop or probe offset.
+#  ADJUST_SURFACE_OFFSETS
 
 # This line includes all the standard macros.
 [include klipper-macros/*.cfg]
@@ -102,8 +108,9 @@ filename: ~/klipper_config/variables.cfg
 [virtual_sdcard]
 path: ~/gcode_files
 
+[display_status]
+
 # Uncomment the sections below if Fluidd complains (because it's confused).
-#[display_status]
 #
 #[gcode_macro CANCEL_PRINT]
 #rename_existing: CANCEL_PRINT_BASE
@@ -245,7 +252,7 @@ All features are configured by setting `variable_` values in the
 `[gcode_macro _km_options]` section. All available variables and their purpose
 are listed in [globals.cfg](globals.cfg#L5).
 
-### Bed Mesh Fast
+### Bed Mesh Improvements
 
 `BED_MESH_CALIBRATE_FAST`
 
@@ -265,6 +272,17 @@ The following additional configuration options are available from
    partial bed probes.
 
 > **Note:** See the [optional section](#bed-mesh) for additional macros.
+
+> **Note:** The bed mesh optimizations are silently disabled for delta printers
+  (because jinja2 lacks the necessary math support) and when the mesh parameters
+  include a [`RELATIVE_REFERENCE_INDEX`](https://www.klipper3d.org/Bed_Mesh.html#the-relative-reference-index)
+  (which is cinompatible with dynamic mesh generation).
+
+`BED_MESH_CHECK`
+
+Checks the `[bed_mesh]` config and warns if `mesh_min` or `mesh_max` could allow
+a move out of range during `BED_MESH_CALIBRATE`. This is run implictily at
+Klipper startup and at the start of `BED_MESH_CALIBRATE`.
 
 ### Bed Surface
 
@@ -299,6 +317,14 @@ argument for `OFFSET` is provided the current offset is displayed.
 > **Note:** The `SET_GCODE_OFFSET` macro is overridden to update the
 > offset for the active surface. This makes the bed surface work with Z offset
 > adjustments made via any interface or client.
+
+#### `ADJUST_SURFACE_OFFSETS`
+
+Adjusts surface offsets to account for changes in the Z endstop position or
+probe Z offset. A message to invoke this command will be shown in the console
+when a relevant change is made to `printer.cfg`.
+
+* `IGNORE` - Set to 1 to reset the saved offsets without adjusting the surfaces.
 
 ### Beep
 
